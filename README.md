@@ -33,3 +33,49 @@ There is no feedback yet other than watching the agent terminal output...
 
 This is pretty much a rip off of the things I like about Travis-CI and Gitlab's Runner, it's simply a yaml file that defines stages and the base image the build is run from.
 
+Sample manifest (which is actually just a `.buildr.yml` in your project directory):
+
+    # If you are unsure, just use `docker:1.12`
+    # Note, that is an alpine image.
+    image: 'which-docker-image'
+    
+    # Environment defines environmental variables passed
+    # to the build container (image from above).
+    # 2.x may allow an encrypted field so your config can
+    # be versioned with your build plan.
+    environment:
+      # Optionally, you can inherit from the agent system.
+      inherit: false
+      # Just a list of NAME=VALUE
+      vars:
+        - FOO=BAR
+        - API_KEY=<something>
+    
+    # Stages is just a list of the top level keys that define the standard build
+    # directive, that will be demonstrated below.
+    stages:
+      - build
+      - deploy
+
+    # The prepare is a default stage, if present you can use it for project
+    # specific config that your base image doesn't provide. It always runs
+    # first if present.
+    prepare:
+      script:
+        - apk add -U git
+        
+    # The standard stage definition has a list of scripts to be run.
+    # Later I will add some tags and the like for limiting when a 
+    # stage will run (or not)
+    build:
+      script:
+        - ./mvnw package
+    
+    # Another arbitrary stage, note the syntax for the command
+    # that needs an envvar - since this is going through a number
+    # of shells to the build container, it needs to be called this way.
+    # If your application or build script needs envvars, it can access
+    # them the "normal" way (e.g. `os.getenv('my_var')`)
+    deploy:
+      script:
+        - sh -c "dpl heroku --api-key - $API_KEY"
