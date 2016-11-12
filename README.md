@@ -79,3 +79,13 @@ Sample manifest (which is actually just a `.buildr.yml` in your project director
     deploy:
       script:
         - sh -c "dpl heroku --api-key - $API_KEY"
+
+
+# TODO
+
+Beyond the tons that is obvious...
+
+* Orchestrator node(s)
+* Backchannel with updates
+* Allow using other containers for other stages, though this is technically already possible since the docker.sock is available in the container running the manifest, so you could do arbitrary docker commands in there. 
+  * This is especially powerful if you have deploy keys in a deploy container and only the agents can pull it.
