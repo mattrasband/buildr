@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-import argparse
 import logging
 import os
 import pathlib
 import sys
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from typing import Dict, Any
 
 import yaml
@@ -69,8 +69,8 @@ class ManifestV1:
 
 def parse_args():
     """Parse the command line arguments"""
-    parser = argparse.ArgumentParser(prog='buildr',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)  # noqa
+    parser = ArgumentParser(prog='buildr',
+                            formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', help='Local directory path', type=str,
                         default='.')
     parser.add_argument('--docker-sock', help='Docker sock', type=str,
@@ -104,10 +104,23 @@ def load_manifest(project_dir: pathlib.Path) -> ManifestV1:
 
 class Buildr:
     def __init__(self, project_dir: pathlib.Path, *,
-                 base_url='unix://var/run/docker.sock', image='docker',
+                 docker_sock='unix://var/run/docker.sock', image='docker',
                  env=None):
+        """
+        Main class that controls the build process, it provides a simple
+        API so we can easily abstract out other ways to build if we don't
+        end up using docker for them all. It could be cool to have a
+        vagrant way.
+
+        :param project_dir: Project directory path
+        :param docker_sock: Docker socket
+        :param image: Builder image, it must have docker installed in it.
+                      Presuming you will be pulling/pushing from private
+                      repos, you should have your docker/config.json in
+                      the main user's home.
+        """
         self.project_dir = project_dir
-        self.base_url = base_url
+        self.base_url = docker_sock
         self.image = image
         self.env = env
         if env is None:
@@ -156,25 +169,19 @@ class Buildr:
         # For debug, you can emulate this with:
         #   docker run -it -v /var/run/docker.sock:/var/run/docker.sock -v "${PWD}":/app \
         #   --workdir /app -e <your envvars> <manifest.image> sh
+        volumes = ['/app', '/var/run/docker.sock']
+        host_config = self.cli.create_host_config(binds=[
+            '{}:/app'.format(self.project_dir.absolute()),
+            '/var/run/docker.sock:/var/run/docker.sock',
+        ])
         container = self.cli.create_container(image=self.image,
                                          command='sh',
                                          detach=True,
                                          environment=self.env,
                                          stdin_open=True,
                                          working_dir='/app',
-                                         volumes=[
-                                             '/app',
-                                             '/var/run/docker.sock',
-                                             # '/root/.docker/config.json',  # TODO: remove
-                                         ],
-                                         host_config=self.cli.create_host_config(binds=[
-                                             '{}:/app'.format(self.project_dir.absolute()),  # noqa
-                                             '/var/run/docker.sock:/var/run/docker.sock',  # noqa
-                                             # TODO: this is temporary, it really should
-                                             # probably just be expected to be baked into
-                                             # the build image.
-                                             # '/root/.docker/config.json:/root/.docker/config.json'  # noqa
-                                         ]))
+                                         volumes=volumes,
+                                         host_config=host_config)
         return container['Id']
 
     def _start_container(self):
@@ -199,7 +206,7 @@ def run_manifest(manifest: ManifestV1, target_dir: pathlib.Path, *,
     :param docker_sock: Location of the docker engine socket.
     :param progress_writer: Stream to write echoed stdout from the
                             build container to, defaults to stdout."""
-    with Buildr(target_dir, base_url=docker_sock, image=manifest.image,
+    with Buildr(target_dir, docker_sock=docker_sock, image=manifest.image,
                 env=manifest.env) as buildr:
         try:
             for stage_name in manifest.stages:
