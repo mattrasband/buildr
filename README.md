@@ -21,6 +21,8 @@ An agent is effectively a build agent, you should be okay to run 1 agent per cor
 
 If the repositories you are accessing require auth, you should have the SSH keys in the standard spots.
 
+Agents will not run by default on OSX docker - primarily because of the volume mount restrictions. You should be able to edit the allowed volumes, but it wasn't working for me so I just use Vagrant.
+
 ## Coordinator
 
 TODO
@@ -89,3 +91,4 @@ Beyond the tons that is obvious...
 * Backchannel with updates
 * Allow using other containers for other stages, though this is technically already possible since the docker.sock is available in the container running the manifest, so you could do arbitrary docker commands in there. 
   * This is especially powerful if you have deploy keys in a deploy container and only the agents can pull it.
+* Protobuf probably...
