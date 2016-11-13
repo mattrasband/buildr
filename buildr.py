@@ -9,10 +9,7 @@ from typing import Dict, Any
 import yaml
 from docker import Client
 
-
-logging.basicConfig()
 logger = logging.getLogger('buildr')
-logger.setLevel(logging.DEBUG)
 
 
 class BuildError(Exception):
@@ -29,7 +26,6 @@ class ManifestV1:
     """Required properties for a version 1 manifest"""
     def __init__(self, manifest_def):
         self._def = manifest_def
-
         self._stages = None  # type: Optional[List]
         self._env = None  # type: Optional[List[str]]
 
@@ -75,7 +71,6 @@ def parse_args():
                         default='.')
     parser.add_argument('--docker-sock', help='Docker sock', type=str,
                         default='unix://var/run/docker.sock')
-
     return parser.parse_args()
 
 
@@ -86,12 +81,12 @@ def load_manifest(project_dir: pathlib.Path) -> ManifestV1:
     :param project_dir: Where the project is on disk
     :returns ManifestV1: The parsed manifest"""
     if not project_dir.exists():
-        sys.exit('Project directory does not exist')
+        raise BuildError('Project directory does not exist.')
     logger.debug('Searching for manifest in %s', project_dir)
 
     buildr = project_dir / '.buildr.yml'
     if not buildr.exists():
-        sys.exit('Build definition not found in project.')
+        raise BuildError('Build manifest not found')
 
     logger.debug('Found manifest, loading...')
 
@@ -99,7 +94,7 @@ def load_manifest(project_dir: pathlib.Path) -> ManifestV1:
         manifest = yaml.safe_load(f)
         if manifest.get('version', 1) == 1:
             return ManifestV1(manifest)
-        sys.exit('Illegal manifest version')
+        raise BuildError('Illegal manifest version')
 
 
 class Buildr:
@@ -131,6 +126,7 @@ class Buildr:
         self._cm = False
 
     def __enter__(self):
+        logger.debug('Connecting to docker CLI')
         self.cli = Client(base_url=self.base_url)
         self.container_id = self._create_container()
         self._start_container()
@@ -174,29 +170,32 @@ class Buildr:
             '{}:/app'.format(self.project_dir.absolute()),
             '/var/run/docker.sock:/var/run/docker.sock',
         ])
+        logger.debug('Creating container "%s"', self.image)
         container = self.cli.create_container(image=self.image,
-                                         command='sh',
-                                         detach=True,
-                                         environment=self.env,
-                                         stdin_open=True,
-                                         working_dir='/app',
-                                         volumes=volumes,
-                                         host_config=host_config)
+                                              command='sh',
+                                              detach=True,
+                                              environment=self.env,
+                                              stdin_open=True,
+                                              working_dir='/app',
+                                              volumes=volumes,
+                                              host_config=host_config)
         return container['Id']
 
     def _start_container(self):
         """Start the container"""
+        logger.debug('Starting container "%s"', self.container_id)
         self.cli.start(self.container_id)
 
     def _close_container(self):
         """Close, shutdown, and remove the container"""
+        logger.debug('Killing and removing container "%s"', self.container_id)
         self.cli.kill(self.container_id)
         self.cli.remove_container(self.container_id)
 
 
 def run_manifest(manifest: ManifestV1, target_dir: pathlib.Path, *,
                  docker_sock='unix://var/run/docker.sock',
-                 progress_writer=sys.stdout,
+                 progress_writer=sys.stdout.write,
                  project_meta=None):
     """Run the manifest stages.
 
@@ -210,9 +209,11 @@ def run_manifest(manifest: ManifestV1, target_dir: pathlib.Path, *,
                 env=manifest.env) as buildr:
         try:
             for stage_name in manifest.stages:
+                logger.debug('Running stage "%s"', stage_name)
                 stage = manifest[stage_name]
                 for script in stage.get('script', []):
-                    rc = buildr.execute(script)
+                    logger.debug('Running script "%s"', script)
+                    rc = buildr.execute(script, writer=progress_writer)
                     if rc != 0:
                         if stage_name == 'prepare':
                             logger.error('Command exited with error, unable to '
@@ -223,6 +224,8 @@ def run_manifest(manifest: ManifestV1, target_dir: pathlib.Path, *,
                             logger.error('Command exited with error, build '
                                          'failed.')
                             raise BuildFailure('Stage failed.')
+                    logger.debug('Script success')
+                logger.debug('Stage success')
         except KeyboardInterrupt:
             print('Run cancelled, exiting')
 
