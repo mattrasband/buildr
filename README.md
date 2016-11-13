@@ -1,49 +1,32 @@
-# Builder CI
+# The stuff we may actually use
 
-**Experimental**
+I am finding a lot of deficiencies with my work's current systems (as a developer), so the `buildr.py` script is meant to be the "job" and it will actually create its own stages. This makes it so we can literally clone the same job for all projects. You can also run the script locally to test builds before pushing them.
 
-This is just an experiment to see what it would take to build a simple CI system built around containers being used to guarantee clean builds.
+Problems with the common "enterprise" build systems (Bamboo and Jenkins) [or problems with how we set ours up...!]:
 
-## Requirements
+* Poor/Non Existent API for programmatically creating plans (and the jobs/stages), setting artifacts, and cloning deploy plans.
+* Isolating/Clean Agents - AFAIK you pretty much make agents with capabilities and register those to builds. We end up with a lot of crap cluttering the system effecting other builds (this may be an issue with how we set them up)
+* Builds are not versioned with the code, if I need to change my build I somehow have to time the build updates with the next version of the code.
+* No good way to run locally while you figure out how you want the full build run to work
 
-You can pretty much just use the Vagrantfile provided, but you'll need to copy your docker login and ssh keys if they're needed (they aren't for anything public :)
+## buildr.py
 
-* docker
-* rabbitmq (`docker run --rm -it -p 5672:5672 -p 15672:15672 rabbitmq:management`)
-* ssh keys (for any repos you want to be able to clone), just put in `~/.ssh`
-* docker login (`~/.docker/config.json`) - auth for any private docker repos
+This simply parses the manifest (`.buildr.yml`) from your project, mounts the project in the target docker container and runs the build. The docker sock is mounted in the container too, so your build can install things like docker-compose and use them for builds/tests.
 
-## Agent
+It then runs each stage and its scripts in the fresh container.
 
-An agent is effectively a build agent, you should be okay to run 1 agent per core on your box.
-
-    python agent.py
-
-If the repositories you are accessing require auth, you should have the SSH keys in the standard spots.
-
-Agents will not run by default on OSX docker - primarily because of the volume mount restrictions. You should be able to edit the allowed volumes, but it wasn't working for me so I just use Vagrant.
-
-## Coordinator
-
-TODO
-
-Temporary: You can log into the rabbit ui and just dump a json message on the build_queue with "repo" and "branch" keys (the branch is optional).
-
-There is no feedback yet other than watching the agent terminal output...
-
-## Manifest File
+## Manifest File (`.buildr.yml`)
 
 This is pretty much a rip off of the things I like about Travis-CI and Gitlab's Runner, it's simply a yaml file that defines stages and the base image the build is run from.
 
 Sample manifest (which is actually just a `.buildr.yml` in your project directory):
 
-    # If you are unsure, just use `docker:1.12`
-    # Note, that is an alpine image.
+    # If you are unsure, just use `docker:1.12`. Adjust any debian commands for alpine if you do
     image: 'which-docker-image'
     
     # Environment defines environmental variables passed
     # to the build container (image from above).
-    # 2.x may allow an encrypted field so your config can
+    # 2.x may allow an encrypted field so your build config can
     # be versioned with your build plan.
     environment:
       # Optionally, you can inherit from the agent system.
@@ -80,8 +63,41 @@ Sample manifest (which is actually just a `.buildr.yml` in your project director
     # them the "normal" way (e.g. `os.getenv('my_var')`)
     deploy:
       script:
-        - sh -c "dpl heroku --api-key - $API_KEY"
+        - docker push ...
 
+
+# The below is just for fun, don't actually use it ;)
+
+**Experimental**
+
+This is just an experiment to see what it would take to build a simple CI system around the `buildr.py`
+
+## Requirements
+
+You can pretty much just use the Vagrantfile provided, but you'll need to copy your docker login and ssh keys if they're needed (they aren't for anything public :)
+
+* docker
+* rabbitmq (`docker run --rm -it -p 5672:5672 -p 15672:15672 rabbitmq:management`)
+* ssh keys (for any repos you want to be able to clone), just put in `~/.ssh`
+* docker login (`~/.docker/config.json`) - auth for any private docker repos
+
+## Agent
+
+An agent is effectively a build agent, you should be okay to run 1 agent per core on your box. It listens to a rabbit queue, clones the repo, and fires off a buildr run.
+
+    python agent.py
+
+If the repositories you are accessing require auth, you should have the SSH keys in the standard spots.
+
+Agents will not run by default on OSX docker - primarily because of the volume mount restrictions (Python's tempdir makes temp directories in a spot that docker isn't happy mounting by default). You should be able to edit the allowed volumes, but it wasn't working for me so I just use Vagrant.
+
+## Coordinator
+
+TODO
+
+Temporary: You can log into the rabbit ui and just dump a json message on the build_queue with "repo" and "branch" keys (the branch is optional).
+
+There is no feedback yet other than watching the agent terminal output...
 
 # TODO
 
