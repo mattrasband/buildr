@@ -1,0 +1,8 @@
+image: 'docker'
+
+stages:
+  - build
+
+build:
+  script:
+    - apk add -U git
