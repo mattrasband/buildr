@@ -14,7 +14,8 @@ BASE_URL = 'https://github.com/mrasband/builder_ci'
 
 
 setup(name='buildr',
-      description=__doc__,
+      description='Simple build manifest runner, mounting the build container via docker.',
+      long_description=__doc__,
       version=__version__,
       author='Matt Rasband',
       author_email='matt.rasband@gmail.com',
