@@ -38,6 +38,7 @@ class Buildr:
     def __enter__(self):
         logger.debug('Using docker sock %s', self.base_url)
         self.cli = docker.Client(base_url=self.base_url)
+        self._pull_container()
         self.container_id = self._create_container()
         self._start_container()
         self._cm = True
@@ -76,6 +77,17 @@ class Buildr:
         else:
             logger.error('Command execution failed: %r', result)
         return ec
+
+    def _pull_container(self):
+        if not ':' in self.image:
+            sys.stderr.write('No tag provided on the image, defaulting '
+                             'to latest')
+            self.image += ':latest'
+        for chunk in self.cli.pull(self.image, stream=True):
+            try:
+                sys.stdout.write(chunk.decode())
+            except UnicodeDecodeError:
+                pass
 
     def _create_container(self):
         """Creates the build runner container"""

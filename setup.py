@@ -8,7 +8,7 @@ the container, docker can be used from the host system.
 """
 from setuptools import setup, find_packages
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 BASE_URL = 'https://github.com/mrasband/builder_ci'
 
