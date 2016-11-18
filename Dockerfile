@@ -1,5 +1,6 @@
-FROM python:3.5-alpine
+FROM docker:1.12
 
+RUN apk add -U python3
 COPY . /app
 WORKDIR /app
 RUN python setup.py install
