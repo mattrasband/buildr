@@ -37,7 +37,7 @@ class Buildr:
 
     def __enter__(self):
         logger.debug('Using docker sock %s', self.base_url)
-        self.cli = docker.Client(base_url=self.base_url)
+        self.cli = docker.Client(base_url=self.base_url, version='auto')
         self._pull_container()
         self.container_id = self._create_container()
         self._start_container()
