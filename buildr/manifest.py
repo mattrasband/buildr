@@ -1,6 +1,5 @@
 import logging
 import pathlib
-import typing
 
 import yaml
 

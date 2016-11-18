@@ -7,7 +7,6 @@ import logging
 import pathlib
 import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from typing import Dict, Any, List
 
 from buildr.buildr import Buildr
 from buildr.exc import BuildError, BuildFailure

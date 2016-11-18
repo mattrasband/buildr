@@ -33,7 +33,6 @@ class Buildr:
 
         self.cli = None
         self.container_id = None
-        self._cm = False
 
     def __enter__(self):
         logger.debug('Using docker sock %s', self.base_url)
@@ -41,19 +40,18 @@ class Buildr:
         self._pull_container()
         self.container_id = self._create_container()
         self._start_container()
-        self._cm = True
 
         return self
 
     def __exit__(self, *args):
         self._close_container()
-        self._cm = False
+        self.container_id = None
 
     def execute(self, command: str, writer=sys.stdout.write) -> int:
         """Execute a build command.
         :param command: Command to execute in the shell
         :returns: Exit code (int)"""
-        if not self._cm:
+        if self.container_id is None:
             raise ValueError('Buildr must be run as a context manager to'
                              ' ensure all resources are reaped on exit.')
 
